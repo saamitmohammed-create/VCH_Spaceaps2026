@@ -1,0 +1,896 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Vigil Crew Health</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Vigil is an offline crew health prototype that compares each reading with the astronaut's own baseline and turns alerts into steps. All crew data is simulated. Code and data generated with AI (Claude, Anthropic).">
+<meta name="generator" content="Claude (Anthropic), AI assistant">
+<meta name="ai-disclosure" content="Code, simulated data, rule logic and page design generated with AI (Claude). No AI-generated images, audio or video.">
+<meta name="author" content="Vigil team, with AI assistance (Claude)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout concept: a single-column crew console. Status and the one thing to do first,
+   then evidence (your numbers against your own baseline). Demo controls dock at the bottom. */
+:root {
+  --bg: #edf0f3;
+  --surface: #ffffff;
+  --surface-2: #e3e8ed;
+  --ink: #14202b;
+  --ink-2: #4a5866;
+  --line: #c8d0d8;
+  --accent: #1b5e9b;
+  --accent-ink: #ffffff;
+  --ok: #1d7a4b;       --ok-bg: #dcefe3;
+  --watch: #9a6200;    --watch-bg: #f6e8c8;
+  --act: #b3261e;      --act-bg: #f6d8d4;
+  --font-display: 'Barlow Condensed', 'Arial Narrow', 'Helvetica Neue', sans-serif;
+  --font-body: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+  --font-data: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d141b; --surface: #15202a; --surface-2: #1d2b37; --ink: #e6edf3; --ink-2: #9aa9b8;
+    --line: #2b3a47; --accent: #6fb1ea; --accent-ink: #0d141b;
+    --ok: #52c58b; --ok-bg: #12301f; --watch: #e6b14d; --watch-bg: #35280d; --act: #ff8174; --act-bg: #3b1714;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d141b; --surface: #15202a; --surface-2: #1d2b37; --ink: #e6edf3; --ink-2: #9aa9b8;
+  --line: #2b3a47; --accent: #6fb1ea; --accent-ink: #0d141b;
+  --ok: #52c58b; --ok-bg: #12301f; --watch: #e6b14d; --watch-bg: #35280d; --act: #ff8174; --act-bg: #3b1714;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.45;
+  padding-inline: max(16px, env(safe-area-inset-left, 0px)) max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 12px 250px;
+}
+.wrap { max-width: 980px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+h1, h2, h3, p { margin: 0; }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mono { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
+.label { font-family: var(--font-display); font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; font-size: 13px; color: var(--ink-2); }
+
+/* header */
+.top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+.brand { display: flex; align-items: baseline; gap: 10px; }
+.brand b { font-family: var(--font-display); font-weight: 700; font-size: 26px; letter-spacing: 0.14em; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.chip { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-display); font-weight: 600; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 3px 8px; border-radius: 3px; background: var(--surface-2); color: var(--ink); white-space: nowrap; }
+.chip.ok { background: var(--ok-bg); color: var(--ok); }
+.chip.watch { background: var(--watch-bg); color: var(--watch); }
+.chip.act { background: var(--act-bg); color: var(--act); }
+.chip.accent { background: var(--accent); color: var(--accent-ink); }
+
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
+.tabs a { font-family: var(--font-display); font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; font-size: 16px; text-decoration: none; color: var(--ink-2);
+  padding: 8px 14px; border-bottom: 3px solid transparent; margin-bottom: -1px; display: inline-flex; gap: 8px; align-items: center; }
+.tabs a[aria-current="page"] { color: var(--ink); border-bottom-color: var(--accent); }
+.badge { background: var(--act); color: #fff; border-radius: 9px; min-width: 18px; height: 18px; padding: 0 5px; display: inline-grid; place-items: center; font-size: 12px; letter-spacing: 0; }
+
+/* panels */
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.status { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; align-items: center; }
+.status .ico { width: 56px; height: 56px; }
+.status.ok { background: var(--ok-bg); border-color: transparent; color: var(--ok); }
+.status.watch { background: var(--watch-bg); border-color: transparent; color: var(--watch); }
+.status.act { background: var(--act-bg); border-color: transparent; color: var(--act); }
+.status .word { font-family: var(--font-display); font-weight: 700; font-size: 44px; line-height: 1; text-transform: uppercase; letter-spacing: 0.04em; }
+.status .sub { grid-column: 1 / -1; color: var(--ink); font-size: 16px; }
+.ico { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.ico.sm { width: 16px; height: 16px; }
+
+.alert h3 { font-family: var(--font-display); font-weight: 600; font-size: 24px; line-height: 1.15; text-wrap: balance; }
+.alert .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.alert p { max-width: 65ch; }
+.note { background: var(--surface-2); border-radius: 4px; padding: 8px 10px; font-size: 14px; max-width: 65ch; }
+.grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 16px; }
+
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 4px; padding: 8px 14px; font-weight: 500; min-height: 40px; }
+.btn:hover { background: var(--surface-2); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.sm { min-height: 34px; padding: 4px 12px; font-size: 14px; }
+.btn.quiet { border-color: transparent; background: transparent; text-decoration: underline; color: var(--ink-2); }
+
+/* baseline table */
+.tablewrap { overflow-x: auto; }
+table.vs { width: 100%; border-collapse: collapse; }
+.vs th, .vs td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--line); font-weight: 400; vertical-align: middle; }
+.vs thead th { font-family: var(--font-display); font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; font-size: 13px; color: var(--ink-2); }
+.vs .n { text-align: right; white-space: nowrap; }
+.vs tbody th { font-weight: 500; }
+.vs tr:last-child th, .vs tr:last-child td { border-bottom: 0; }
+.sig { display: inline-flex; align-items: center; gap: 8px; }
+.pill { display: inline-block; min-width: 64px; text-align: center; padding: 2px 8px; border-radius: 3px; font-family: var(--font-data); font-size: 13px; background: var(--surface-2); }
+.pill.watch { background: var(--watch-bg); color: var(--watch); }
+.pill.act { background: var(--act-bg); color: var(--act); }
+.foot { font-size: 13px; color: var(--ink-2); max-width: 70ch; }
+.facts { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+.facts div { display: flex; flex-direction: column; }
+.facts b { font-family: var(--font-data); font-weight: 500; font-size: 18px; }
+
+/* trends */
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.seg button { border: 0; background: var(--surface); padding: 6px 14px; min-height: 36px; font-weight: 500; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.trend { gap: 8px; }
+.trend .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.trend .val { font-family: var(--font-data); font-size: 24px; font-weight: 500; line-height: 1.1; }
+.trend .val small { font-size: 13px; color: var(--ink-2); margin-left: 4px; }
+.trend svg { width: 100%; height: auto; display: block; }
+.band { fill: var(--accent); fill-opacity: 0.14; }
+.meanline { stroke: var(--accent); stroke-width: 1; stroke-dasharray: 4 3; fill: none; }
+.axis { stroke: var(--line); stroke-width: 1; fill: none; }
+.series { stroke: var(--ink); stroke-width: 1.75; fill: none; stroke-linejoin: round; stroke-linecap: round; }
+.dot { fill: var(--ink-2); }
+.dot.watch { fill: var(--watch); }
+.dot.act { fill: var(--act); }
+.dot.end { stroke: var(--surface); stroke-width: 2; }
+.ax { font-family: var(--font-data); font-size: 10px; fill: var(--ink-2); }
+
+/* actions */
+.acts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.acts li { display: flex; flex-direction: column; gap: 8px; padding: 12px 0; border-top: 1px solid var(--line); }
+.acts li:first-child { border-top: 0; padding-top: 0; }
+.acts .text { max-width: 65ch; }
+.acts .btns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.acts li.done .text { color: var(--ink-2); text-decoration: line-through; text-decoration-thickness: 1px; }
+.reasons { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.empty { color: var(--ink-2); max-width: 60ch; }
+.log { width: 100%; border-collapse: collapse; font-size: 14px; }
+.log th, .log td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); font-weight: 400; vertical-align: top; }
+.log thead th { font-family: var(--font-display); font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; font-size: 13px; color: var(--ink-2); }
+.queue { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.queue li { display: flex; gap: 10px; align-items: baseline; }
+
+/* demo dock */
+.dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: var(--surface); border-top: 1px solid var(--line);
+  padding-top: 10px; padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.dock .in { max-width: 980px; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; }
+.dock .hint { font-size: 14px; min-height: 20px; }
+.dock .hint b { font-family: var(--font-display); font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); margin-right: 8px; }
+.dock .btns { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.dock .sp { flex: 1 1 8px; }
+.dock .auto { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.dock .clock { flex: 1 1 180px; min-width: 0; display: flex; align-items: center; gap: 10px; }
+.track { flex: 1; min-width: 40px; height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.fill { height: 100%; width: 0; background: var(--accent); }
+#clock { font-family: var(--font-data); font-size: 13px; color: var(--ink-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.about h2 { font-family: var(--font-display); font-weight: 600; font-size: 22px; line-height: 1.15; }
+.about p, .refs li { max-width: 70ch; }
+.refs { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 10px; }
+.about a, .legal a, .note a { color: var(--accent); text-underline-offset: 2px; overflow-wrap: anywhere; }
+.facts .foot { margin-top: 2px; }
+.legal { font-size: 13px; color: var(--ink-2); max-width: 75ch; }
+@media (prefers-reduced-motion: no-preference) {
+  .panel { transition: background-color .2s; }
+  .fill { transition: width .2s linear; }
+}
+@media (max-width: 480px) {
+  .tabs { overflow-x: auto; }
+  .tabs { gap: 0; }
+  .tabs a { padding: 8px 8px; font-size: 14px; letter-spacing: 0.04em; gap: 5px; }
+  .status .word { font-size: 36px; }
+  .status .ico { width: 44px; height: 44px; }
+  .vs th, .vs td { padding: 8px 4px; }
+  .alert h3 { font-size: 22px; }
+}
+@media (max-width: 380px) {
+  .tabs a { padding: 8px 5px; font-size: 13px; letter-spacing: 0.02em; gap: 4px; }
+}
+</style>
+
+<div class="wrap" id="app"></div>
+<div class="dock"><div class="in" id="dock"></div></div>
+
+<script>
+/* Vigil engine: simulator, personal baselines, rules, actions.
+   Pure functions, no DOM, no network. Runs in the page and in Node tests. */
+(function (root) {
+  'use strict';
+
+  // NASA reference values used by the prototype (sources are listed on the About screen):
+  //  careerLimit: NASA-STD-3001 Vol. 1 Rev B career effective dose limit, 600 mSv (NASA OCHMO-TB-020 Rev E, Dec 2022)
+  //  issSleep: ISS crews averaged 6.5 h of sleep a night against 8.5 h scheduled; nights of 6 h or less went with
+  //            slower reaction speed (Jones et al. 2022, Sleep 45(3), NASA Reaction Self Test study)
+  var NASA = { careerLimit: 600, issSleep: 6.5, shortSleep: 6.0 };
+  var DAY0 = 101;   // mission day of the first simulated day
+  var HIST = 40;    // days of history generated at start
+
+  // Rule thresholds: l = [z-score, minimum % change] for watch (l1) and act (l2).
+  // bad = direction that counts as worse. win = days averaged (3 = recent 3-day mean, 1 = today).
+  var METRICS = {
+    sleep:    { label: 'Sleep',              unit: 'h',        dec: 1, bad: -1, domain: 'sleep',     win: 3, l1: [2.3, 8],  l2: [3.6, 14] },
+    hrv:      { label: 'HRV',                unit: 'ms',       dec: 0, bad: -1, domain: 'cardio',    win: 3, l1: [2.3, 10], l2: [3.6, 18] },
+    restHR:   { label: 'Resting heart rate', unit: 'bpm',      dec: 0, bad:  1, domain: 'cardio',    win: 3, l1: [2.3, 5],  l2: [3.6, 9]  },
+    reaction: { label: 'Reaction time',      unit: 'ms',       dec: 0, bad:  1, domain: 'cognition', win: 3, l1: [2.3, 6],  l2: [3.6, 11] },
+    mood:     { label: 'Mood',               unit: '/5',       dec: 1, bad: -1, domain: 'mood',      win: 3, l1: [2.3, 12], l2: [3.6, 22] },
+    stress:   { label: 'Stress',             unit: '/5',       dec: 1, bad:  1, domain: 'mood',      win: 3, l1: [2.3, 15], l2: [3.6, 27] },
+    co2:      { label: 'Cabin CO₂',     unit: 'ppm',      dec: 0, bad:  1, domain: 'habitat',   win: 1, l1: [4, 15],   l2: [8, 30]   },
+    dose:     { label: 'Radiation dose',     unit: 'mSv/day',  dec: 2, bad:  1, domain: 'radiation', win: 1, l1: [6, 50],   l2: [20, 200] }
+  };
+  var ORDER = ['sleep', 'hrv', 'restHR', 'reaction', 'mood', 'stress', 'co2', 'dose'];
+
+  var DOMAIN_LABEL = { sleep: 'Sleep', cardio: 'Heart signals', cognition: 'Reaction time', mood: 'Mood' };
+  var DOMAIN_ORDER = ['sleep', 'cardio', 'cognition', 'mood'];
+
+  var SINGLE_TITLE = {
+    sleep: 'Sleep is below your normal',
+    cardio: 'Heart signals are off your baseline',
+    cognition: 'Reaction time is slower than your normal',
+    mood: 'Mood and stress are off your baseline'
+  };
+
+  // ---------- helpers ----------
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      var t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  function gauss(r) {
+    var u = 0, v = 0;
+    while (!u) u = r();
+    while (!v) v = r();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  }
+  function clamp(x, lo, hi) { return Math.max(lo, Math.min(hi, x)); }
+  function mean(a) { var s = 0; for (var i = 0; i < a.length; i++) s += a[i]; return s / a.length; }
+  function sd(a) {
+    var m = mean(a), s = 0;
+    for (var i = 0; i < a.length; i++) s += (a[i] - m) * (a[i] - m);
+    return Math.sqrt(s / (a.length - 1));
+  }
+  function joinList(a) {
+    if (a.length <= 1) return a.join('');
+    return a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
+  }
+
+  function fmt(key, v) {
+    var m = METRICS[key];
+    if (key === 'co2') return Math.round(v).toLocaleString('en-US');
+    return v.toFixed(m.dec);
+  }
+  function withUnit(key, v) {
+    var m = METRICS[key];
+    var n = fmt(key, v);
+    return m.unit === '/5' ? n + '/5' : n + ' ' + m.unit;
+  }
+
+  // ---------- simulator ----------
+  function createSim(seed) {
+    var sim = {
+      seed: seed,
+      rng: mulberry32(seed),
+      days: [],
+      st: { debt: 0, disrupt: 0, co2Armed: false, co2Active: 0, co2Resid: 0, lastRise: 0, spikeArmed: false, cum: 55 }
+    };
+    for (var i = 0; i < HIST; i++) step(sim, []);
+    return sim;
+  }
+
+  // Adds one day. fx = effects of actions completed the day before ('sleep', 'scrubber').
+  function step(sim, fx) {
+    var st = sim.st, g = function () { return gauss(sim.rng); };
+    var has = function (k) { return fx.indexOf(k) >= 0; };
+    var events = [];
+
+    if (st.disrupt > 0) {
+      st.debt = Math.min(3, st.debt + (st.disrupt === 3 ? 1.5 : 1));
+      st.disrupt--;
+      events.push('sleep-loss');
+    } else {
+      st.debt = Math.max(0, st.debt - (0.4 + (has('sleep') ? 0.9 : 0)));
+    }
+
+    var rise = 0;
+    if (st.co2Armed || st.co2Active > 0) {
+      if (has('scrubber') && st.co2Active > 0) {
+        st.co2Resid = st.lastRise * 0.12;
+        st.co2Active = 0; st.co2Armed = false; st.lastRise = 0;
+      } else {
+        st.co2Active = Math.min(6, st.co2Active + 1);
+        st.co2Armed = false;
+        rise = Math.min(2400, 900 * st.co2Active);
+        st.lastRise = rise;
+        events.push('co2-fault');
+      }
+    } else {
+      st.co2Resid *= 0.3;
+    }
+    var f = rise / 2400;
+    var d = st.debt;
+
+    var dose = 0.55 + g() * 0.04;
+    if (st.spikeArmed) { dose = 0.55 * 6 + g() * 0.1; st.spikeArmed = false; events.push('solar-storm'); }
+    st.cum += dose;
+
+    var headaches = 0;
+    if (rise > 0) headaches = st.co2Active >= 2 ? 3 : 2;
+    else for (var c = 0; c < 3; c++) if (sim.rng() < 0.02) headaches++;
+
+    var rec = {
+      i: sim.days.length,
+      md: DAY0 + sim.days.length,
+      sleep:    clamp(NASA.issSleep - 0.8 * d + g() * 0.35, 3, 10),
+      restHR:   58 + 2 * d + 1.5 * f + g() * 1.6,
+      hrv:      62 * (1 - 0.07 * d - 0.04 * f) + g() * 4,
+      reaction: 285 * (1 + 0.06 * d + 0.08 * f) + g() * 12,
+      mood:     clamp(3.8 - 0.35 * d - 0.4 * f + g() * 0.3, 1, 5),
+      stress:   clamp(2.2 + 0.35 * d + 0.4 * f + g() * 0.3, 1, 5),
+      co2:      2200 + rise + st.co2Resid + g() * 90,
+      dose:     dose,
+      headaches: headaches,
+      cum:      st.cum,
+      events:   events
+    };
+    sim.days.push(rec);
+    rec.flag = analyze(sim.days, rec.i).level > 0;   // flagged days stay out of later baselines
+    return rec;
+  }
+
+  function inject(sim, type) {
+    var st = sim.st, did = false;
+    if (type === 'sleep') { st.disrupt = 3; did = true; }
+    if (type === 'co2' && st.co2Active === 0) { st.co2Armed = true; did = true; }
+    if (type === 'solar') { st.spikeArmed = true; did = true; }
+    if (did) { st.injected = (st.injected || 0) + 1; st.lastEvent = sim.days.length; }
+  }
+
+  // Random event scheduler for auto mode. rnd is Math.random or a seeded function.
+  // Returns 'sleep', 'co2', 'solar' or null. Waits until nothing is running, no alert is live and
+  // at least 12 days have passed since the last event, so each one can recover. The first event
+  // is never later than day 2.
+  var EVENT_P = 0.35, MIN_GAP = 12;
+  function suggestEvent(sim, rnd, level) {
+    var st = sim.st;
+    if (activeEvents(sim).length || level > 0) return null;
+    var first = !(st.injected > 0) && sim.days.length - HIST >= 1;
+    if (!first) {
+      if (st.injected > 0 && sim.days.length - st.lastEvent < MIN_GAP) return null;
+      if (rnd() >= EVENT_P) return null;
+    }
+    var x = rnd();
+    return x < 0.45 ? 'sleep' : x < 0.75 ? 'co2' : 'solar';
+  }
+
+  function activeEvents(sim) {
+    var out = [], st = sim.st;
+    if (st.disrupt > 0) out.push('sleep loss (' + st.disrupt + (st.disrupt === 1 ? ' night' : ' nights') + ' left)');
+    if (st.co2Armed || st.co2Active > 0) out.push('CO₂ fault');
+    if (st.spikeArmed) out.push('solar storm');
+    return out;
+  }
+
+  // ---------- baselines and analysis ----------
+  function median(a) {
+    var b = a.slice().sort(function (x, y) { return x - y; }), n = b.length;
+    return n % 2 ? b[(n - 1) / 2] : (b[n / 2 - 1] + b[n / 2]) / 2;
+  }
+  // Baseline = mean and spread of the last 30 days ending 3 days ago. Days that were part of an alert
+  // are frozen out, and days far from the median are left out, so a past problem does not widen
+  // the normal range.
+  function baselineFor(days, idx, key) {
+    var from = Math.max(0, idx - 32), to = idx - 3, vals = [], all = [];
+    for (var i = from; i <= to; i++) { all.push(days[i][key]); if (!days[i].flag) vals.push(days[i][key]); }
+    if (vals.length < 14) vals = all;
+    if (vals.length < 14) return null;
+    var kept = vals;
+    for (var pass = 0; pass < 5; pass++) {
+      var med = median(kept);
+      var mad = median(kept.map(function (v) { return Math.abs(v - med); }));
+      var cut = 3 * Math.max(1.4826 * mad, 0.01 * Math.abs(med));
+      var next = kept.filter(function (v) { return Math.abs(v - med) <= cut; });
+      if (next.length === kept.length || next.length < 14) break;
+      kept = next;
+    }
+    var m = mean(kept), s = Math.max(sd(kept), 0.02 * Math.abs(m));
+    return { mean: m, sd: s, lo: m - 1.5 * s, hi: m + 1.5 * s, n: kept.length };
+  }
+
+  function metricState(days, idx, key) {
+    var def = METRICS[key], base = baselineFor(days, idx, key);
+    var latest = days[idx][key];
+    if (!base) return { key: key, ok: false, value: latest };
+    var win = [];
+    for (var k = Math.max(0, idx - def.win + 1); k <= idx; k++) win.push(days[k][key]);
+    var r = mean(win);
+    var pct = (r - base.mean) / base.mean * 100;
+    var z = (r - base.mean) / base.sd * def.bad;
+    var worsePct = pct * def.bad;
+    var level = 0;
+    if (z >= def.l2[0] && worsePct >= def.l2[1]) level = 2;
+    else if (z >= def.l1[0] && worsePct >= def.l1[1]) level = 1;
+    var improving = level > 0 && def.win > 1 &&
+      (latest - base.mean) * def.bad < 0.7 * (r - base.mean) * def.bad;
+    return { key: key, ok: true, value: latest, recent: r, base: base, pct: pct, z: z, level: level, improving: improving };
+  }
+
+  function phrase(m) {
+    var p = Math.abs(m.pct).toFixed(0) + '%';
+    switch (m.key) {
+      case 'sleep':    return 'sleep is ' + p + ' below your baseline';
+      case 'reaction': return 'reaction time is ' + p + ' slower';
+      case 'restHR':   return 'resting heart rate is ' + p + ' higher';
+      case 'hrv':      return 'HRV is ' + p + ' lower';
+      case 'mood':     return 'mood is ' + p + ' lower';
+      case 'stress':   return 'stress is ' + p + ' higher';
+    }
+    return '';
+  }
+
+  // ---------- action catalog (demo wording, to be validated by flight surgeons) ----------
+  function act(alertId, key, text, effect, extra) {
+    var a = { key: alertId + ':' + key, text: text, effect: effect || 'none', downlink: false };
+    if (extra) for (var k in extra) a[k] = extra[k];
+    return a;
+  }
+  function downlinkAction(id) { return act(id, 'downlink', 'Add this summary to the next ground downlink.', 'none', { downlink: true }); }
+
+  function personalActions(domains, level) {
+    var id = 'personal';
+    var hasSleepish = domains.indexOf('sleep') >= 0 || domains.indexOf('cognition') >= 0;
+    if (hasSleepish) {
+      return [
+        act(id, 'workload', level === 2 ? 'Cut today’s physical workload by 30% and postpone any EVA.' : 'Cut today’s physical workload by 15%.', 'sleep'),
+        act(id, 'sleepwindow', 'Protect an 8-hour sleep window tonight: dim the lights 60 minutes before and keep your sleep station quiet.', 'sleep'),
+        level === 2 ? downlinkAction(id)
+          : act(id, 'retest', 'Drink 500 ml of extra water and repeat the 30-second reaction test in 2 hours.')
+      ];
+    }
+    if (domains.indexOf('cardio') >= 0) {
+      return [
+        act(id, 'rest', 'Sit and rest for 20 minutes, then repeat the heart-rate reading.'),
+        act(id, 'lighter', 'Swap today’s hard exercise for a light session.'),
+        level === 2 ? downlinkAction(id) : act(id, 'retest', 'Repeat the reading tomorrow morning before activity.')
+      ];
+    }
+    return [
+      act(id, 'privatetime', 'Take 15 minutes of private time for something you choose: music, a note home, a window.'),
+      act(id, 'routine', 'Keep meal and exercise times fixed today.'),
+      level === 2 ? downlinkAction(id) : act(id, 'crewcheck', 'Have a short check-in with a crewmate you trust.')
+    ];
+  }
+
+  function analyze(days, idx) {
+    var today = days[idx];
+    var metrics = {};
+    ORDER.forEach(function (k) { metrics[k] = metricState(days, idx, k); });
+
+    var alerts = [];
+
+    // Personal deviation alerts, folded into one compound alert when several domains move together.
+    var domainLevel = {}, domainMetrics = {};
+    DOMAIN_ORDER.forEach(function (d) { domainLevel[d] = 0; domainMetrics[d] = []; });
+    ORDER.forEach(function (k) {
+      var def = METRICS[k], m = metrics[k];
+      if (!m.ok || DOMAIN_ORDER.indexOf(def.domain) < 0 || m.level === 0) return;
+      domainLevel[def.domain] = Math.max(domainLevel[def.domain], m.level);
+      domainMetrics[def.domain].push(m);
+    });
+    var flagged = DOMAIN_ORDER.filter(function (d) { return domainLevel[d] > 0; });
+    if (flagged.length) {
+      var all = [];
+      flagged.forEach(function (d) { all = all.concat(domainMetrics[d]); });
+      all.sort(function (a, b) { return b.z - a.z; });
+      var top = all.slice(0, 3);
+      var detail = 'Over the last 3 days, ' + joinList(top.map(phrase)) + '.';
+      var level, title;
+      if (flagged.length >= 2) {
+        level = (flagged.length >= 3 || flagged.some(function (d) { return domainLevel[d] === 2; })) ? 2 : 1;
+        var names = flagged.map(function (d) { return DOMAIN_LABEL[d]; });
+        title = flagged.length >= 3 ? 'Several signals are off your baseline together'
+          : names[0] + ' and ' + names[1].charAt(0).toLowerCase() + names[1].slice(1) + ' are off your baseline together';
+      } else {
+        level = domainLevel[flagged[0]];
+        title = SINGLE_TITLE[flagged[0]];
+      }
+      var sleepM = metrics.sleep;
+      var evidence = (sleepM.ok && sleepM.level > 0 && sleepM.recent <= NASA.shortSleep)
+        ? 'In NASA\u2019s ISS Reaction Self Test study, nights of 6 hours or less went with slower reaction speed.' : '';
+      alerts.push({
+        id: 'personal', kind: 'personal', level: level, title: title, detail: detail, evidence: evidence,
+        metrics: all.map(function (m) { return m.key; }),
+        improving: all.every(function (m) { return m.improving; }),
+        domains: flagged,
+        actions: personalActions(flagged, level)
+      });
+    }
+
+    // Habitat: CO2 together with shared symptoms points away from the individual.
+    var co2 = metrics.co2, h = today.headaches;
+    if (co2.ok && co2.level > 0) {
+      var co2pct = Math.abs(co2.pct).toFixed(0);
+      var shared = h >= 2;
+      alerts.push({
+        id: 'env', kind: 'env', level: shared ? 2 : 1,
+        title: shared ? 'Cabin CO₂ is high and the crew feels it' : 'Cabin CO₂ is above normal',
+        detail: 'CO₂ is ' + co2pct + '% above this module’s normal (' + withUnit('co2', co2.value) + '). ' +
+          (shared ? h + ' of 3 crewmates report headache. A shared pattern like this points to the habitat, not to one person.'
+                  : 'No shared symptoms reported yet.'),
+        metrics: ['co2'], improving: false,
+        actions: [
+          act('env', 'scrubber', 'Check the CO₂ scrubber status in Module A.', 'scrubber'),
+          act('env', 'relocate', 'Move non-essential work to a module with normal CO₂ until the check is done.'),
+          act('env', 'symptoms', 'Log symptoms for each crewmate and repeat the reaction test in 2 hours.')
+        ]
+      });
+    } else if (h >= 2) {
+      alerts.push({
+        id: 'env', kind: 'env', level: 1,
+        title: 'Several crewmates report headache',
+        detail: h + ' of 3 crewmates report headache while CO₂ is in its normal range. Look for other habitat causes.',
+        metrics: [], improving: false,
+        actions: [
+          act('env', 'vent', 'Check ventilation and the air-quality sensors in the module where symptoms started.'),
+          act('env', 'symptoms', 'Log symptoms for each crewmate and repeat the check in 2 hours.')
+        ]
+      });
+    }
+
+    // Radiation spike.
+    var dose = metrics.dose;
+    if (dose.ok && dose.level > 0) {
+      var times = (today.dose / dose.base.mean).toFixed(1);
+      alerts.push({
+        id: 'radiation', kind: 'radiation', level: dose.level,
+        title: 'Radiation dose rate is high',
+        detail: 'Today’s dose is ' + times + '× your usual ' + dose.base.mean.toFixed(2) + ' mSv/day. Mission total so far: ' + today.cum.toFixed(1) + ' mSv, ' + (today.cum / NASA.careerLimit * 100).toFixed(0) + '% of NASA\u2019s 600 mSv career limit.',
+        metrics: ['dose'], improving: false,
+        actions: [
+          act('radiation', 'shelter', 'Move to the shielded area until the dose rate falls.'),
+          act('radiation', 'noeva', 'Hold any EVA until the all-clear.'),
+          act('radiation', 'doselog', 'Log where you were and when, for the dose record.')
+        ]
+      });
+    }
+
+    // If the habitat is flagged, tell the personal alert it may be partly the air.
+    var envAlert = alerts.filter(function (a) { return a.id === 'env' && a.level === 2; })[0];
+    alerts.forEach(function (a) {
+      if (a.id === 'personal' && envAlert) a.note = 'CO₂ is also high. Part of this may come from the air, so fix the CO₂ first and re-check.';
+    });
+
+    var kindRank = { radiation: 0, env: 1, personal: 2 };
+    alerts.sort(function (a, b) { return b.level - a.level || kindRank[a.kind] - kindRank[b.kind]; });
+
+    var level = alerts.reduce(function (m, a) { return Math.max(m, a.level); }, 0);
+    return { idx: idx, md: today.md, today: today, metrics: metrics, alerts: alerts, level: level };
+  }
+
+  var api = {
+    METRICS: METRICS, ORDER: ORDER, DAY0: DAY0, NASA: NASA,
+    createSim: createSim, step: step, inject: inject, activeEvents: activeEvents, suggestEvent: suggestEvent,
+    analyze: analyze, baselineFor: baselineFor, fmt: fmt, withUnit: withUnit
+  };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  else root.Vigil = api;
+})(typeof window !== 'undefined' ? window : this);
+
+
+</script>
+<script>
+(function () {
+  'use strict';
+  var V = window.Vigil;
+  var SEED = 5;
+
+  var sim, responses, log, queue, pendingIgnore, flash, range = 7, tab = 'today';
+  var auto = true, secs = 8, left = secs * 1000, lastTick = Date.now();   // auto mode: a timer advances the day and starts random events
+  var REASONS = ['Not relevant', 'Mission-critical task', 'Already handled', 'I disagree with the alert'];
+  var EVENT_NOTE = {
+    sleep: 'Random event started: crew sleep is disrupted for 3 nights.',
+    co2: 'Random event started: CO₂ scrubber fault in Module A.',
+    solar: 'Random event started: solar particle event.'
+  };
+
+  function reset() {
+    sim = V.createSim(SEED);
+    responses = {}; log = []; queue = []; pendingIgnore = null; flash = '';
+    left = secs * 1000;
+  }
+  function A() { return V.analyze(sim.days, sim.days.length - 1); }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+  var ICON = {
+    ok: '<svg class="ico __c" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M7 12.5l3.2 3.2L17 9"/></svg>',
+    watch: '<svg class="ico __c" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.5"/></svg>',
+    act: '<svg class="ico __c" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2h8l6 6v8l-6 6H8l-6-6V8z"/><path d="M12 7v6M12 16.5v.5"/></svg>'
+  };
+  function icon(l, cls) { return ICON[levelName(l)].replace('__c', cls || ''); }
+  function levelName(l) { return l === 2 ? 'act' : l === 1 ? 'watch' : 'ok'; }
+  var LEVEL_WORD = { 0: 'Nominal', 1: 'Watch', 2: 'Act today' };
+  var LEVEL_CHIP = { 0: 'Normal', 1: 'Watch', 2: 'Act' };
+  var KIND = { personal: 'Your signals', env: 'Habitat', radiation: 'Radiation' };
+
+  function signed(p) { var r = Math.round(p); return (r > 0 ? '+' : r < 0 ? '−' : '') + Math.abs(r) + '%'; }
+
+  function allActions(a) { var out = []; a.alerts.forEach(function (al) { al.actions.forEach(function (x) { out.push({ act: x, alert: al }); }); }); return out; }
+  function openCount(a) { return allActions(a).filter(function (x) { return !responses[x.act.key]; }).length; }
+
+  // ---------- screens ----------
+  function viewToday(a) {
+    var lv = a.level, nm = levelName(lv);
+    var sub = lv === 0 ? 'Every signal is inside your own normal range. Keep your routine.' : lv === 1 ? 'Something is drifting from your normal. Details below.' : 'Work through the steps below, then check again tomorrow.';
+    var h = '<section class="panel status ' + nm + '" aria-label="Overall status">' + icon(lv) +
+      '<div><div class="label" style="color:inherit">Today · mission day ' + a.md + '</div><div class="word">' + LEVEL_WORD[lv] + '</div></div>' +
+      '<p class="sub">' + esc(sub) + '</p></section>';
+
+    var shown = a.alerts.slice(0, 2);
+    if (shown.length) {
+      h += '<div class="grid-2">';
+      shown.forEach(function (al) {
+        var n = al.actions.filter(function (x) { return !responses[x.key]; }).length;
+        h += '<article class="panel alert"><div class="row"><span class="chip ' + levelName(al.level) + '">' + icon(al.level, 'sm') + LEVEL_CHIP[al.level] + '</span>' +
+          '<span class="chip">' + KIND[al.kind] + '</span>' + (al.improving ? '<span class="chip ok">Improving</span>' : '') + '</div>' +
+          '<h3>' + esc(al.title) + '</h3><p>' + esc(al.detail) + '</p>' +
+          (al.note ? '<p class="note">' + esc(al.note) + '</p>' : '') +
+          (al.evidence ? '<p class="note">' + esc(al.evidence) + ' <a href="#about">Source</a></p>' : '') +
+          '<div class="row"><a class="btn primary" href="#actions" data-k="open-' + al.id + '" style="text-decoration:none;display:inline-flex;align-items:center">' +
+          (n ? n + (n === 1 ? ' step' : ' steps') + ' to do' : 'Steps logged') + '</a></div></article>';
+      });
+      h += '</div>';
+      if (a.alerts.length > 2) h += '<p class="foot">' + (a.alerts.length - 2) + ' more in Actions.</p>';
+    }
+
+    h += '<section class="panel"><div class="label">Today against your own baseline</div><div class="tablewrap"><table class="vs"><thead><tr>' +
+      '<th scope="col">Signal</th><th scope="col" class="n">Today</th><th scope="col" class="n">Baseline</th><th scope="col" class="n">Change</th></tr></thead><tbody>';
+    V.ORDER.forEach(function (k) {
+      var m = a.metrics[k], def = V.METRICS[k];
+      if (!m.ok) return;
+      h += '<tr><th scope="row"><span class="sig">' + (m.level ? icon(m.level, 'sm ' + levelName(m.level)).replace('class="ico', 'style="color:var(--' + levelName(m.level) + ')" class="ico') : '') +
+        esc(def.label) + '</span></th><td class="n mono">' + V.withUnit(k, m.value) + '</td><td class="n mono">' + V.withUnit(k, m.base.mean) +
+        '</td><td class="n"><span class="pill ' + (m.level ? levelName(m.level) : '') + '">' + signed(m.pct) + '</span></td></tr>';
+    });
+    h += '</tbody></table></div><p class="foot">Baseline is your own last 30 days, ending 3 days ago, leaving out days that were part of an alert. Body signals compare your last 3 days to it. Cabin CO₂ and radiation compare today.</p>';
+    h += '<div class="facts"><div><span class="label">Crew headaches today</span><b>' + a.today.headaches + ' of 3</b></div>' +
+      '<div><span class="label">Mission radiation total</span><b>' + a.today.cum.toFixed(1) + ' mSv</b>' +
+      '<span class="foot">' + (a.today.cum / V.NASA.careerLimit * 100).toFixed(0) + '% of NASA\u2019s ' + V.NASA.careerLimit + ' mSv career limit</span></div></div></section>';
+    return h;
+  }
+
+  function chart(a, k, n) {
+    var days = sim.days.slice(-n), vals = days.map(function (d) { return d[k]; });
+    var m = a.metrics[k], def = V.METRICS[k], b = m.base;
+    var lo = Math.min(Math.min.apply(null, vals), b.lo), hi = Math.max(Math.max.apply(null, vals), b.hi);
+    var pad = (hi - lo) * 0.12 || 1; lo -= pad; hi += pad;
+    var W = 320, H = 128, L = 40, R = 10, T = 8, B = 22;
+    function X(i) { return L + (n === 1 ? 0 : i * (W - L - R) / (n - 1)); }
+    function Y(v) { return T + (hi - v) / (hi - lo) * (H - T - B); }
+    var pts = vals.map(function (v, i) { return X(i).toFixed(1) + ',' + Y(v).toFixed(1); }).join(' ');
+    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(def.label) + ' over the last ' + n + ' days with your normal range shaded">';
+    s += '<rect class="band" x="' + L + '" y="' + Y(b.hi).toFixed(1) + '" width="' + (W - L - R) + '" height="' + (Y(b.lo) - Y(b.hi)).toFixed(1) + '"/>';
+    s += '<line class="meanline" x1="' + L + '" x2="' + (W - R) + '" y1="' + Y(b.mean).toFixed(1) + '" y2="' + Y(b.mean).toFixed(1) + '"/>';
+    s += '<path class="axis" d="M' + L + ' ' + T + 'V' + (H - B) + 'H' + (W - R) + '"/>';
+    s += '<polyline class="series" points="' + pts + '"/>';
+    vals.forEach(function (v, i) {
+      var outside = (v - b.mean) * def.bad > 0 && Math.abs(v - b.mean) > 1.5 * b.sd;
+      var last = i === vals.length - 1;
+      if (n <= 7 || last || outside) {
+        var cls = outside ? (m.level === 2 ? 'act' : 'watch') : '';
+        s += '<circle class="dot ' + cls + (last ? ' end' : '') + '" cx="' + X(i).toFixed(1) + '" cy="' + Y(v).toFixed(1) + '" r="' + (last ? 4.5 : 3) + '"/>';
+      }
+    });
+    s += '<text class="ax" x="' + (L - 5) + '" y="' + (T + 8) + '" text-anchor="end">' + V.fmt(k, hi) + '</text>';
+    s += '<text class="ax" x="' + (L - 5) + '" y="' + (H - B) + '" text-anchor="end">' + V.fmt(k, lo) + '</text>';
+    s += '<text class="ax" x="' + L + '" y="' + (H - 6) + '">MD ' + days[0].md + '</text>';
+    s += '<text class="ax" x="' + (W - R) + '" y="' + (H - 6) + '" text-anchor="end">MD ' + days[days.length - 1].md + '</text>';
+    return s + '</svg>';
+  }
+
+  function viewTrends(a) {
+    var h = '<div style="display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between"><div class="seg" role="group" aria-label="Range">' +
+      '<button type="button" data-a="range" data-n="7" data-k="r7" aria-pressed="' + (range === 7) + '">7 days</button>' +
+      '<button type="button" data-a="range" data-n="30" data-k="r30" aria-pressed="' + (range === 30) + '">30 days</button></div>' +
+      '<p class="foot">Shaded band is your own normal range. Dashed line is your average.</p></div><div class="grid-2">';
+    V.ORDER.forEach(function (k) {
+      var m = a.metrics[k], def = V.METRICS[k];
+      if (!m.ok) return;
+      h += '<section class="panel trend"><div class="head"><div><div class="label">' + esc(def.label) + '</div><div class="val">' + V.fmt(k, m.value) + '<small>' + esc(def.unit) + '</small></div></div>' +
+        '<span class="pill ' + (m.level ? levelName(m.level) : '') + '" title="Change against your baseline">' + signed(m.pct) + '</span></div>' + chart(a, k, range) + '</section>';
+    });
+    return h + '</div>';
+  }
+
+  function actionRow(al, x) {
+    var r = responses[x.key], cls = r && r.status === 'done' ? 'done' : '';
+    var h = '<li class="' + cls + '"><div class="text">' + esc(x.text) + '</div><div class="btns">';
+    if (!r && pendingIgnore !== x.key) {
+      h += '<button type="button" class="btn primary sm" data-a="done" data-key="' + esc(x.key) + '" data-k="d-' + esc(x.key) + '">Done</button>' +
+        '<button type="button" class="btn sm" data-a="ignore" data-key="' + esc(x.key) + '" data-k="i-' + esc(x.key) + '">Ignore</button>';
+    } else if (!r) {
+      h += '</div><div class="reasons" role="group" aria-label="Reason for ignoring"><span class="label">Why ignore?</span>';
+      REASONS.forEach(function (why, i) {
+        h += '<button type="button" class="btn sm" data-a="reason" data-key="' + esc(x.key) + '" data-why="' + i + '" data-k="w' + i + '">' + why + '</button>';
+      });
+      h += '<button type="button" class="btn quiet sm" data-a="cancel" data-k="cancel">Cancel</button>';
+    } else {
+      h += '<span class="chip ' + (r.status === 'done' ? 'ok' : '') + '">' + (r.status === 'done' ? 'Done' : 'Ignored: ' + esc(r.reason)) + '</span>' +
+        '<button type="button" class="btn quiet sm" data-a="undo" data-key="' + esc(x.key) + '" data-k="u-' + esc(x.key) + '">Undo</button>';
+    }
+    return h + '</div></li>';
+  }
+
+  function viewAbout() {
+    var L = function (href, text) { return '<a href="' + href + '" target="_blank" rel="noopener noreferrer">' + text + '</a>'; };
+    return '<section class="panel about"><h2>What this is</h2>' +
+      '<p>Vigil is a prototype that helps a crew member on a long mission notice when their own health signals move away from their normal, and tells them what to do about it without waiting for ground support. It gives awareness and action support. It does not diagnose.</p>' +
+      '<p>Every crew reading on these screens is simulated by code in this page. No real person\u2019s data is used.</p></section>' +
+
+      '<section class="panel about"><h2>NASA data and resources used</h2><ul class="refs">' +
+      '<li><b>Career radiation limit.</b> NASA-STD-3001 Volume 1, Revision B sets a career effective dose limit of 600 mSv. Vigil shows the mission radiation total as a share of it, on Today and in radiation alerts. Source: ' +
+        L('https://www.nasa.gov/wp-content/uploads/2023/03/radiation-protection-technical-brief-ochmo.pdf', 'NASA Radiation Protection Technical Brief, OCHMO-TB-020 Rev E (December 2022)') + '.</li>' +
+      '<li><b>Sleep and reaction speed on the ISS.</b> NASA\u2019s Reaction Self Test study of 24 ISS astronauts found they slept 6.5 \u00b1 1.4 hours a night against 8.5 hours scheduled, and that nights of 6 hours or less went with slower reaction speed. The simulator\u2019s usual sleep is set to 6.5 hours, the daily check-in (sleep, short reaction test, stress rating) is modeled on that test, and sleep alerts quote the finding. Source: ' +
+        L('https://pmc.ncbi.nlm.nih.gov/articles/PMC8919197', 'Jones et al., Sleep 45(3), 2022') + '.</li>' +
+      '<li><b>Daily radiation dose.</b> The simulated usual dose of about 0.55 mSv a day is set near the roughly 0.5 mSv a day that the same NASA brief quotes for a surface-based mission.</li>' +
+      '<li><b>Cabin CO\u2082.</b> Vigil compares CO\u2082 with the module\u2019s own normal instead of a fixed limit. NASA removed its CO\u2082 spacecraft maximum allowable concentrations in 2022 and manages CO\u2082 by expected performance and health effects. Source: ' +
+        L('https://ntrs.nasa.gov/api/citations/20230001817/downloads/JSC-20584_Rev_B_FINAL_Update.pdf', 'JSC 20584 Rev B (November 2022)') + '.</li></ul>' +
+      '<p class="foot">Vigil is not an official NASA product and uses no NASA logos or mission identifiers.</p></section>' +
+
+      '<section class="panel about"><h2>Use of AI</h2>' +
+      '<p>The code, the data simulator, the rule logic, the step wording and the design of this page were generated with Claude, an AI assistant made by Anthropic, working from the team\u2019s plan. All graphics are drawn by code. No AI-generated images, audio or video are used.</p>' +
+      '<p>The step wording and the alert thresholds are placeholders. Flight surgeons would need to review them before any real use.</p></section>' +
+
+      '<section class="panel about"><h2>Other resources</h2><ul class="refs">' +
+      '<li>Fonts from Google Fonts, all under the SIL Open Font License: Barlow and Barlow Condensed (Jeremy Tribby), IBM Plex Mono (IBM).</li>' +
+      '<li>No other libraries, images or third-party code. The page makes no network requests besides the fonts.</li></ul></section>';
+  }
+
+  function viewActions(a) {
+    var h = '';
+    if (!a.alerts.length) {
+      h += '<section class="panel"><div class="label">Action list</div><p class="empty">Nothing to do today. When a signal moves off your baseline, the steps for it show up here.</p></section>';
+    }
+    a.alerts.forEach(function (al) {
+      h += '<section class="panel"><div class="row" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center"><span class="chip ' + levelName(al.level) + '">' + icon(al.level, 'sm') + LEVEL_CHIP[al.level] + '</span><span class="chip">' + KIND[al.kind] + '</span></div>' +
+        '<h2 style="font-family:var(--font-display);font-weight:600;font-size:22px;line-height:1.15">' + esc(al.title) + '</h2><ul class="acts">';
+      al.actions.forEach(function (x) { h += actionRow(al, x); });
+      h += '</ul></section>';
+    });
+
+    h += '<section class="panel"><div class="label">Ground downlink queue</div>';
+    if (queue.length) {
+      h += '<ul class="queue">' + queue.map(function (q) { return '<li><span class="mono">MD ' + q.md + '</span><span>' + esc(q.title) + '</span></li>'; }).join('') + '</ul>' +
+        '<div><button type="button" class="btn sm" data-a="send" data-k="send">Simulate link restored: send queue</button></div>';
+    } else {
+      h += '<p class="empty">Empty. Steps that ask you to add a summary to the downlink wait here until the next contact window.</p>';
+    }
+    h += '</section>';
+
+    h += '<section class="panel"><div class="label">Decision log</div>';
+    if (log.length) {
+      h += '<div class="tablewrap"><table class="log"><thead><tr><th scope="col">Day</th><th scope="col">Step</th><th scope="col">You chose</th></tr></thead><tbody>' +
+        log.map(function (e) { return '<tr><td class="mono">MD ' + e.md + '</td><td>' + esc(e.text) + '</td><td>' + (e.status === 'done' ? 'Done' : 'Ignored: ' + esc(e.reason)) + '</td></tr>'; }).join('') + '</tbody></table></div>';
+    } else {
+      h += '<p class="empty">Each day’s decisions are saved here when you move to the next day. Ignore reasons show which rules need tuning.</p>';
+    }
+    h += '</section>';
+    h += '<p class="legal">Vigil gives awareness and action support. It does not diagnose. Step wording is demo text and needs review by flight surgeons before real use.</p>';
+    return h;
+  }
+
+  // ---------- chrome ----------
+  function render() {
+    var a = A(), focus = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.k : null;
+    var open = openCount(a);
+    var app = '<header class="top"><div class="brand"><b>VIGIL</b><span class="label">Crew A · mission day ' + a.md + '</span></div>' +
+      '<div class="meta"><span class="chip">Ground link offline</span><span class="chip' + (queue.length ? ' accent' : '') + '">Downlink queue ' + queue.length + '</span></div></header>';
+    app += '<nav class="tabs" aria-label="Screens">' +
+      ['today', 'trends', 'actions', 'about'].map(function (t) {
+        return '<a href="#' + t + '" data-k="tab-' + t + '"' + (tab === t ? ' aria-current="page"' : '') + '>' + t +
+          (t === 'actions' && open ? '<span class="badge" aria-label="' + open + ' open">' + open + '</span>' : '') + '</a>';
+      }).join('') + '</nav>';
+    app += tab === 'trends' ? viewTrends(a) : tab === 'actions' ? viewActions(a) : tab === 'about' ? viewAbout() : viewToday(a);
+    app += '<p class="legal">All analysis runs in this page on simulated data. Nothing is sent anywhere. A real build would keep readings encrypted on the device and readable only by the crew member. The code and the simulated data were generated with AI (Claude). <a href="#about">Sources and AI disclosure</a></p>';
+    document.getElementById('app').innerHTML = app;
+
+    var ev = V.activeEvents(sim), hint;
+    if (flash) hint = flash;
+    else if (ev.length) hint = 'Event running: ' + ev.join(', ') + '. ' + (auto ? 'Watch the data over the next days.' : 'Press Next day to see it in the data.');
+    else if (a.level > 0 && open > 0) hint = 'An alert is live. Open Actions and mark the steps done' + (auto ? ' before the day ends.' : ', then press Next day.');
+    else if (a.level > 0) hint = 'Steps are logged. ' + (auto ? 'Watch whether the data recovers.' : 'Press Next day to see whether the data recovers.');
+    else if (auto) hint = sim.days.length === 40 ? 'The first random event starts within two days.' : 'All clear. A random event can start on any day.';
+    else hint = 'Auto is paused. Inject an event or press Next day.';
+    document.getElementById('dock').innerHTML = '<p class="hint" role="status" aria-live="polite"><b>' + (auto ? 'Auto' : 'Paused') + '</b>' + esc(hint) + '</p>' +
+      '<div class="auto"><button type="button" class="btn sm" data-a="auto" data-k="auto">' + (auto ? 'Pause' : 'Resume auto') + '</button>' +
+      '<div class="seg" role="group" aria-label="Seconds per mission day">' +
+      [4, 8, 16].map(function (n) { return '<button type="button" data-a="speed" data-n="' + n + '" data-k="s' + n + '" aria-pressed="' + (secs === n) + '">' + n + ' s/day</button>'; }).join('') + '</div>' +
+      '<div class="clock"><div class="track" aria-hidden="true"><div class="fill" id="fill" style="width:' + ((1 - left / (secs * 1000)) * 100).toFixed(1) + '%"></div></div><span class="mono" id="clock"></span></div></div>' +
+      '<div class="btns"><button type="button" class="btn sm" data-a="inject" data-type="sleep" data-k="e-sleep">Inject sleep loss</button>' +
+      '<button type="button" class="btn sm" data-a="inject" data-type="co2" data-k="e-co2">Inject CO₂ fault</button>' +
+      '<button type="button" class="btn sm" data-a="inject" data-type="solar" data-k="e-solar">Inject solar storm</button><span class="sp"></span>' +
+      '<button type="button" class="btn quiet sm" data-a="reset" data-k="reset">Reset</button>' +
+      '<button type="button" class="btn primary" data-a="next" data-k="next">Next day ▶</button></div>';
+    paintClock();
+
+    if (focus) { var el = document.querySelector('[data-k="' + focus + '"]'); if (el) el.focus(); }
+  }
+
+  // Countdown bar in the dock. Updated in place so the page is not redrawn every tick.
+  function paintClock() {
+    var f = document.getElementById('fill'), c = document.getElementById('clock');
+    if (!f || !c) return;
+    f.style.width = ((1 - left / (secs * 1000)) * 100).toFixed(1) + '%';
+    c.textContent = !auto ? 'Auto paused' : pendingIgnore ? 'Waiting for your choice' : 'Next day in ' + Math.ceil(left / 1000) + ' s';
+  }
+
+  // Applies the day's decisions, in auto mode maybe starts a random event, then moves to the next day.
+  function nextDay() {
+    var a = A(), fx = [];
+    allActions(a).forEach(function (x) {
+      var r = responses[x.act.key];
+      if (r) log.unshift({ md: a.md, text: x.act.text, status: r.status, reason: r.reason || '' });
+      if (r && r.status === 'done' && x.act.effect !== 'none') fx.push(x.act.effect);
+    });
+    responses = {}; pendingIgnore = null; flash = '';
+    if (auto) {
+      var ev = V.suggestEvent(sim, Math.random, a.level);
+      if (ev) { V.inject(sim, ev); flash = EVENT_NOTE[ev]; }
+    }
+    V.step(sim, fx);
+    left = secs * 1000;
+  }
+
+  // Timer: counts down while auto is on, the tab is visible and no ignore reason is being chosen.
+  setInterval(function () {
+    var now = Date.now(), dt = now - lastTick;
+    lastTick = now;
+    if (!auto || document.hidden || pendingIgnore) { paintClock(); return; }
+    left -= dt;
+    if (left <= 0) { nextDay(); render(); return; }
+    paintClock();
+  }, 200);
+
+  function findAction(a, key) { var f = allActions(a).filter(function (x) { return x.act.key === key; })[0]; return f; }
+
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-a]');
+    if (!b) return;
+    var act = b.dataset.a, key = b.dataset.key, a = A(), hit;
+    flash = '';
+    if (act === 'done') {
+      hit = findAction(a, key);
+      responses[key] = { status: 'done' };
+      if (hit && hit.act.downlink) queue.push({ key: key, md: a.md, title: hit.alert.title });
+      pendingIgnore = null;
+    } else if (act === 'ignore') { pendingIgnore = key; }
+    else if (act === 'cancel') { pendingIgnore = null; }
+    else if (act === 'reason') { responses[key] = { status: 'ignored', reason: REASONS[+b.dataset.why] }; pendingIgnore = null; }
+    else if (act === 'undo') { delete responses[key]; queue = queue.filter(function (q) { return q.key !== key; }); }
+    else if (act === 'send') { flash = queue.length + (queue.length === 1 ? ' item' : ' items') + ' sent to the ground team.'; queue = []; }
+    else if (act === 'range') { range = +b.dataset.n; }
+    else if (act === 'inject') {
+      V.inject(sim, b.dataset.type);
+      flash = 'Event queued. It shows in the next day’s data.';
+    }
+    else if (act === 'auto') { auto = !auto; left = secs * 1000; lastTick = Date.now(); }
+    else if (act === 'speed') { secs = +b.dataset.n; left = secs * 1000; lastTick = Date.now(); }
+    else if (act === 'reset') { reset(); }
+    else if (act === 'next') { nextDay(); }
+    render();
+  });
+
+  function route() {
+    var t = (location.hash || '').replace('#', '');
+    tab = (t === 'trends' || t === 'actions' || t === 'about') ? t : 'today';
+    render();
+  }
+  window.addEventListener('hashchange', route);
+
+  reset();
+  route();
+})();
+
+</script>
+
+</body></html>
